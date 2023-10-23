@@ -1,5 +1,17 @@
-const menu = require('./menu');
 const express = require('express');
+const mysql2 = require('mysql2');
+
+const connection = mysql2.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: 'rootroot',
+    database: 'burguertic'
+});
+
+connection.connect((err) => {
+    if (err) throw err;
+    console.log('Connected!');
+});
 
 const app = express();
 const cors = require("cors");
@@ -9,19 +21,23 @@ app.use(express());
 
 // 1
 app.get('/menu', (_, res) => {
-    res.status(200).json(menu);
+    connection.query("SELECT * FROM plates;", (err, rows) => {
+        if (err) return res.status(500).json(err);
+        res.status(200).json(rows);
+    });
 });
 
 // 2
 app.get('/menu/:id', (req, res) => {
-    const entry = menu.find((x) => x.id === parseInt(req.params.id));
-
-    if (entry)
-        res.status(200).json(entry);
-    else
-        res.sendStatus(404);
+    connection.query("SELECT * FROM plates WHERE id = ?;", [req.params.id], (err, rows) => {
+        if (err) return res.status(500).json(err);
+        if (rows.length === 0)
+            return res.sendStatus(404);
+        res.status(200).json(rows[0]);
+    });
 });
 
+/*
 // 3
 app.get('/combos', (_, res) => {
     const entries = menu.filter((x) => x.tipo === 'combo');
@@ -31,45 +47,48 @@ app.get('/combos', (_, res) => {
     else
         res.sendStatus(404);
 });
+*/
 
 // 4
 app.get('/principales', (_, res) => {
-    const entries = menu.filter((x) => x.tipo === 'principal');
-
-    if (entries)
-        res.status(200).json(entries);
-    else 
-        res.sendStatus(404);
+    connection.query("SELECT * FROM plates WHERE tipo = 'principal';", (err, rows) => {
+        if (err) return res.status(500).json(err);
+        if (rows.length === 0)
+            return res.sendStatus(404);
+        res.status(200).json(rows);
+    });
 });
 
 // 5
 app.get('/postres', (_, res) => {
-    const entries = menu.filter((x) => x.tipo === 'postre');
-
-    if (entries)
-        res.status(200).json(entries);
-    else
-        res.sendStatus(404);
+    connection.query("SELECT * FROM plates WHERE tipo = 'postre';", (err, rows) => {
+        if (err) return res.status(500).json(err);
+        if (rows.length === 0)
+            return res.sendStatus(404);
+        res.status(200).json(rows);
+    });
 });
 
 // 6
 app.post('/pedido', (req, res) => {
     const { productos } = req.body;
-    let precio = 0;
 
-    productos.forEach((x) => {
-        const producto = menu.find(y => y.id === parseInt(x.id))
-
-        if (!producto || parseInt(x.cantidad) < 0)
-            return res.sendStatus(400);
+    connection.query("SELECT 'id', 'precio' FROM plates WHERE id IN (?);", [productos.map(x => parseInt(x.id))], (err, rows) => {
+        if (err) return res.status(500).json(err);
+        if (rows.length === 0)
+            return res.sendStatus(404);
         
-        precio += producto.precio * parseInt(x.cantidad);
-    });
+        let precio = 0;
 
-    res.status(200).json({
-        msg: 'Pedido recibido',
-        precio: precio,
-    })
+        rows.forEach((x) => {
+            precio += x.precio * productos.find(y => y.id == x.id).cantidad;
+        });
+
+        res.status(200).json({
+            msg: 'Pedido recibido',
+            precio: precio,
+        });
+    });
 });
 
 app.listen(3000, () => {
