@@ -73,6 +73,17 @@ app.get('/postres', (_, res) => {
 app.post('/pedido', (req, res) => {
     const { productos } = req.body;
 
+    connection.query("INSERT INTO pedidos (id_usuario, fecha, estado) VALUES (0, ?, 'pendiente');", [new Date().toISOString().slice(0, 19).replace('T', ' ')], (err, rows) => {
+        if (err) return res.status(500).json(err);
+        connection.query("INSERT INTO pedidos_plates (id_pedido, id_plate, cantidad) VALUES " + productos.map(x => `(${rows.insertId}, ?, ?)`).join(', ') + ";",
+        [productos.map(x => parseInt(x.id), parseInt(x.cantidad))], (err, rows) => {
+            if (err) return res.status(500).json(err);
+        });
+    });
+
+    return res.sendStatus(201);
+
+    /*
     connection.query("SELECT 'id', 'precio' FROM plates WHERE id IN (?);", [productos.map(x => parseInt(x.id))], (err, rows) => {
         if (err) return res.status(500).json(err);
         if (rows.length === 0)
@@ -88,6 +99,18 @@ app.post('/pedido', (req, res) => {
             msg: 'Pedido recibido',
             precio: precio,
         });
+    });
+    */
+});
+
+app.get('/pedidos/:id', (req, res) => {
+    const { id } = req.body;
+
+    connection.query("SELECT * FROM pedidos JOIN usuarios ON pedidos.id_usuario = usuario.id WHERE pedidos.id_usuario = ?;",
+    [parseInt(id)], 
+    (err, rows) => {
+        if (err) return res.status(500).json(err);
+        return res.status(200).json(rows);
     });
 });
 
