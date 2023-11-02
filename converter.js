@@ -16,7 +16,7 @@ connection.connect((err) => {
 });
 
 plates.forEach(element => {
-    connection.query("INSERT INTO plates (id, nombre, precio, descripcion) VALUES (?, ?, ?, ?);", [element.id, element.nombre, element.precio, element.descripcion], (err, rows) => {
+    connection.query("INSERT INTO plates (id, nombre, precio, descripcion, tipo) VALUES (?, ?, ?, ?, ?);", [element.id, element.nombre, element.precio, element.descripcion, element.tipo], (err, rows) => {
         console.log(err);
         console.log(rows);
     });
