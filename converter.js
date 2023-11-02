@@ -1,12 +1,10 @@
-const menu = require('./menu');
+const plates = require('./menu');
 const mysql2 = require('mysql2');
-
-const plates = menu.filter((x) => x.tipo !== 'combo');
 
 const connection = mysql2.createConnection({
     host: 'localhost',
     user: 'root',
-    password: 'rootroot',
+    password: '',
     database: 'burguertic'
 });
 

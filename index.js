@@ -4,7 +4,7 @@ const mysql2 = require('mysql2');
 const connection = mysql2.createConnection({
     host: 'localhost',
     user: 'root',
-    password: 'rootroot',
+    password: '',
     database: 'burguertic'
 });
 
@@ -37,17 +37,17 @@ app.get('/menu/:id', (req, res) => {
     });
 });
 
-/*
+
 // 3
 app.get('/combos', (_, res) => {
-    const entries = menu.filter((x) => x.tipo === 'combo');
-
-    if (entries)
-        res.status(200).json(entries);
-    else
-        res.sendStatus(404);
+    connection.query("SELECT * FROM plates WHERE tipo = 'principal';", (err, rows) => {
+        if (err) return res.status(500).json(err);
+        if (rows.length === 0)
+            return res.sendStatus(404);
+        res.status(200).json(rows);
+    });
 });
-*/
+
 
 // 4
 app.get('/principales', (_, res) => {
@@ -73,15 +73,17 @@ app.get('/postres', (_, res) => {
 app.post('/pedido', (req, res) => {
     const { productos } = req.body;
 
-    connection.query("INSERT INTO pedidos (id_usuario, fecha, estado) VALUES (0, ?, 'pendiente');", [new Date().toISOString().slice(0, 19).replace('T', ' ')], (err, rows) => {
+    connection.query("INSERT INTO pedidos (id_usuario, fecha, estado) VALUES (1, ?, 'pendiente');", [new Date().toISOString().slice(0, 19).replace('T', ' ')], (err, rows) => {
         if (err) return res.status(500).json(err);
-        connection.query("INSERT INTO pedidos_plates (id_pedido, id_plate, cantidad) VALUES " + productos.map(x => `(${rows.insertId}, ?, ?)`).join(', ') + ";",
-        [productos.map(x => parseInt(x.id), parseInt(x.cantidad))], (err, rows) => {
-            if (err) return res.status(500).json(err);
-        });
+        connection.query("INSERT INTO pedidos_platos (id_pedido, id_plato, cantidad) VALUES " + productos.map(x => `(${rows.insertId}, ?, ?)`).join(', ') + ";",
+            productos.map(x => [parseInt(x.id), parseInt(x.cantidad)]).flat(), (err, rows) => {
+                if (err) return res.status(500).json(err);
+                return res.status(201).json({
+                    id: rows.insertId
+                });
+            });
     });
 
-    return res.sendStatus(201);
 
     /*
     connection.query("SELECT 'id', 'precio' FROM plates WHERE id IN (?);", [productos.map(x => parseInt(x.id))], (err, rows) => {
@@ -104,16 +106,33 @@ app.post('/pedido', (req, res) => {
 });
 
 app.get('/pedidos/:id', (req, res) => {
-    const { id } = req.body;
+    const { id } = req.params;
 
-    connection.query("SELECT * FROM pedidos JOIN usuarios ON pedidos.id_usuario = usuario.id WHERE pedidos.id_usuario = ?;",
-    [parseInt(id)], 
-    (err, rows) => {
-        if (err) return res.status(500).json(err);
-        return res.status(200).json(rows);
-    });
+    connection.query("SELECT * FROM pedidos JOIN usuarios ON pedidos.id_usuario = usuarios.id WHERE pedidos.id_usuario = ?;",
+        [parseInt(id)],
+        (err, rows) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json(err);
+            }
+            let response = [];
+            rows.forEach(x => {
+                connection.query("SELECT plates.id, plates.nombre, plates.precio, pedidos_plates.cantidad FROM pedidos JOIN pedidos_platos ON plato.id = pedidos_platos.id_plato WHERE pedidos_platos.id_pedido = ?", [x.id], (err, rows) => {
+                    response.push(
+                        {
+                            id: x.id,
+                            fecha: x.fecha,
+                            estado: x.estado,
+                            id_usuario: id,
+                            platos: rows
+                        }
+                    )
+                })
+            })
+            return res.status(200).json(response);
+        });
 });
 
-app.listen(3000, () => {
-    console.log('Escuchando en puerto 3000');
+app.listen(9000, () => {
+    console.log('Escuchando en puerto 9000');
 });
