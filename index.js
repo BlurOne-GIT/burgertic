@@ -21,7 +21,7 @@ app.use(express());
 
 // 1
 app.get('/menu', (_, res) => {
-    connection.query("SELECT * FROM plates;", (err, rows) => {
+    connection.query("SELECT * FROM platos;", (err, rows) => {
         if (err) return res.status(500).json(err);
         res.status(200).json(rows);
     });
@@ -29,7 +29,7 @@ app.get('/menu', (_, res) => {
 
 // 2
 app.get('/menu/:id', (req, res) => {
-    connection.query("SELECT * FROM plates WHERE id = ?;", [req.params.id], (err, rows) => {
+    connection.query("SELECT * FROM platos WHERE id = ?;", [req.params.id], (err, rows) => {
         if (err) return res.status(500).json(err);
         if (rows.length === 0)
             return res.sendStatus(404);
@@ -40,7 +40,7 @@ app.get('/menu/:id', (req, res) => {
 
 // 3
 app.get('/combos', (_, res) => {
-    connection.query("SELECT * FROM plates WHERE tipo = 'principal';", (err, rows) => {
+    connection.query("SELECT * FROM platos WHERE tipo = 'principal';", (err, rows) => {
         if (err) return res.status(500).json(err);
         if (rows.length === 0)
             return res.sendStatus(404);
@@ -51,7 +51,7 @@ app.get('/combos', (_, res) => {
 
 // 4
 app.get('/principales', (_, res) => {
-    connection.query("SELECT * FROM plates WHERE tipo = 'principal';", (err, rows) => {
+    connection.query("SELECT * FROM platos WHERE tipo = 'principal';", (err, rows) => {
         if (err) return res.status(500).json(err);
         if (rows.length === 0)
             return res.sendStatus(404);
@@ -61,7 +61,7 @@ app.get('/principales', (_, res) => {
 
 // 5
 app.get('/postres', (_, res) => {
-    connection.query("SELECT * FROM plates WHERE tipo = 'postre';", (err, rows) => {
+    connection.query("SELECT * FROM platos WHERE tipo = 'postre';", (err, rows) => {
         if (err) return res.status(500).json(err);
         if (rows.length === 0)
             return res.sendStatus(404);
@@ -86,7 +86,7 @@ app.post('/pedido', (req, res) => {
 
 
     /*
-    connection.query("SELECT 'id', 'precio' FROM plates WHERE id IN (?);", [productos.map(x => parseInt(x.id))], (err, rows) => {
+    connection.query("SELECT 'id', 'precio' FROM platos WHERE id IN (?);", [productos.map(x => parseInt(x.id))], (err, rows) => {
         if (err) return res.status(500).json(err);
         if (rows.length === 0)
             return res.sendStatus(404);
@@ -108,7 +108,7 @@ app.post('/pedido', (req, res) => {
 app.get('/pedidos/:id', (req, res) => {
     const { id } = req.params;
 
-    connection.query("SELECT * FROM pedidos JOIN usuarios ON pedidos.id_usuario = usuarios.id WHERE pedidos.id_usuario = ?;",
+    connection.query("SELECT pedidos.id as id_pedido, pedidos.fecha, pedidos.estado, platos.id as id_plato, platos.nombre, platos.precio, pedidos_platos.cantidad FROM pedidos JOIN pedidos_platos ON pedidos.id = pedidos_platos.id_pedido JOIN platos ON pedidos_platos.id_plato = platos.id WHERE pedidos.id_usuario = ?;",
         [parseInt(id)],
         (err, rows) => {
             if (err) {
@@ -117,17 +117,28 @@ app.get('/pedidos/:id', (req, res) => {
             }
             let response = [];
             rows.forEach(x => {
-                connection.query("SELECT plates.id, plates.nombre, plates.precio, pedidos_plates.cantidad FROM pedidos JOIN pedidos_platos ON plato.id = pedidos_platos.id_plato WHERE pedidos_platos.id_pedido = ?", [x.id], (err, rows) => {
+                let i = response.findIndex(y => y.id == x.id_pedido)
+                if (i == -1)
+                {
                     response.push(
-                        {
-                            id: x.id,
-                            fecha: x.fecha,
-                            estado: x.estado,
-                            id_usuario: id,
-                            platos: rows
-                        }
-                    )
-                })
+                    {
+                        id: x.id_pedido,
+                        fecha: x.fecha,
+                        estado: x.estado,
+                        id_usuario: id,
+                        platos: []
+                    }
+                    );
+                    i = response.length-1;
+                }
+                response[i].platos.push(
+                    {
+                        id: x.id_plato,
+                        nombre: x.nombre,
+                        precio: x.precio,
+                        cantidad: x.cantidad
+                    }
+                );
             })
             return res.status(200).json(response);
         });
