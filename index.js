@@ -144,6 +144,47 @@ app.get('/pedidos/:id', (req, res) => {
         });
 });
 
+app.post("/usuarios", (req, res) => {
+    let { nombre, apellido, email, password } = req.body;
+    let ret = false;
+    connection.query("SELECT usuarios.* FROM usuarios WHERE usuarios.email = ?;",
+    [email], (err, rows) => {
+        if (err)
+        {
+            ret = true;
+            return res.status(500).json(err);
+        }
+        else if (rows.length != 0)
+        {
+            ret = true;
+            return res.sendStatus(400);
+        }
+    });
+
+    if (ret) return;
+
+    connection.query("INSERT INTO usuarios (nombre, apellido, email, password) VALUES (?, ?, ?, ?);",
+    [nombre, apellido, email, password], (err, rows) => {
+        if (err) return res.status(500).json(err);
+        return res.status(201).json({
+            id: rows.insertId
+        });
+    });
+});
+
+app.post("/login", (req, res) => {
+    let { email, password } = req.body;
+    connection.query("SELECT usuarios.id, usuarios.nombre, usuarios.apellido, usuarios.email FROM usuarios WHERE usuarios.email = ? AND usuarios.password = ?;",
+    [email, password], (err, rows) =>
+    {
+        if (err) return res.status(500).json(err);
+        if (rows) return res.status(401).json({
+            error: "Usuario o contraseña incorrectos"
+        });
+        return res.status(200).json(rows)
+    });
+});
+
 app.listen(9000, () => {
     console.log('Escuchando en puerto 9000');
 });
