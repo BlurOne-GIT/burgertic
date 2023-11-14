@@ -1,5 +1,7 @@
 const express = require('express');
 const mysql2 = require('mysql2');
+const cors = require("cors");
+const bcrypt = require("bcryptjs");
 
 const connection = mysql2.createConnection({
     host: 'localhost',
@@ -14,7 +16,6 @@ connection.connect((err) => {
 });
 
 const app = express();
-const cors = require("cors");
 app.use(cors());
 app.use(express.json());
 app.use(express());
@@ -72,8 +73,9 @@ app.get('/postres', (_, res) => {
 // 6
 app.post('/pedido', (req, res) => {
     const { productos } = req.body;
+    const { id } = req.headers.authorization; 
 
-    connection.query("INSERT INTO pedidos (id_usuario, fecha, estado) VALUES (1, ?, 'pendiente');", [new Date().toISOString().slice(0, 19).replace('T', ' ')], (err, rows) => {
+    connection.query("INSERT INTO pedidos (id_usuario, fecha, estado) VALUES (?, ?, 'pendiente');", [id, new Date().toISOString().slice(0, 19).replace('T', ' ')], (err, rows) => {
         if (err) return res.status(500).json(err);
         connection.query("INSERT INTO pedidos_platos (id_pedido, id_plato, cantidad) VALUES " + productos.map(x => `(${rows.insertId}, ?, ?)`).join(', ') + ";",
             productos.map(x => [parseInt(x.id), parseInt(x.cantidad)]).flat(), (err, rows) => {
@@ -83,30 +85,10 @@ app.post('/pedido', (req, res) => {
                 });
             });
     });
-
-
-    /*
-    connection.query("SELECT 'id', 'precio' FROM platos WHERE id IN (?);", [productos.map(x => parseInt(x.id))], (err, rows) => {
-        if (err) return res.status(500).json(err);
-        if (rows.length === 0)
-            return res.sendStatus(404);
-        
-        let precio = 0;
-
-        rows.forEach((x) => {
-            precio += x.precio * productos.find(y => y.id == x.id).cantidad;
-        });
-
-        res.status(200).json({
-            msg: 'Pedido recibido',
-            precio: precio,
-        });
-    });
-    */
 });
 
-app.get('/pedidos/:id', (req, res) => {
-    const { id } = req.params;
+app.get('/pedidos', (req, res) => {
+    const { id } = req.headers.authorization;
 
     connection.query("SELECT pedidos.id as id_pedido, pedidos.fecha, pedidos.estado, platos.id as id_plato, platos.nombre, platos.precio, pedidos_platos.cantidad FROM pedidos JOIN pedidos_platos ON pedidos.id = pedidos_platos.id_pedido JOIN platos ON pedidos_platos.id_plato = platos.id WHERE pedidos.id_usuario = ?;",
         [parseInt(id)],
@@ -163,6 +145,11 @@ app.post("/usuarios", (req, res) => {
 
     if (ret) return;
 
+    bcrypt.hash(password, 10, (err, hash) => {
+        if (err) return res.status(500).json(err);
+        password = hash;
+    });
+
     connection.query("INSERT INTO usuarios (nombre, apellido, email, password) VALUES (?, ?, ?, ?);",
     [nombre, apellido, email, password], (err, rows) => {
         if (err) return res.status(500).json(err);
@@ -174,6 +161,10 @@ app.post("/usuarios", (req, res) => {
 
 app.post("/login", (req, res) => {
     let { email, password } = req.body;
+    bcrypt.hash(password, 10, (err, hash) => {
+        if (err) return res.status(500).json(err);
+        password = hash;
+    });
     connection.query("SELECT usuarios.id, usuarios.nombre, usuarios.apellido, usuarios.email FROM usuarios WHERE usuarios.email = ? AND usuarios.password = ?;",
     [email, password], (err, rows) =>
     {
